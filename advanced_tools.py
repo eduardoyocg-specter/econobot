@@ -10,6 +10,38 @@ import requests
 # Importacion para el calculo de la raiz cuadrada en la regresion
 from math import sqrt
 
+# ------------------------------------------------------------------
+# Configuracion de las conexiones a las APIs
+# ------------------------------------------------------------------
+# Al ejecutar la aplicacion en un servidor en la nube aparecieron dos
+# problemas que no se daban en la computadora local:
+#   1. Algunos servidores rechazan las peticiones que no se identifican.
+#   2. La salida por IPv6 no siempre funciona, y la peticion se queda
+#      esperando hasta agotar el tiempo de espera.
+# Las siguientes lineas resuelven ambos casos.
+
+CABECERAS = {
+    "User-Agent": "EconoBot/1.0 (agente academico de analisis economico)",
+    "Accept": "application/json"
+}
+
+try:
+    import socket
+    import urllib3.util.connection as conexion_urllib3
+
+    def _solo_ipv4():
+        return socket.AF_INET
+
+    conexion_urllib3.allowed_gai_family = _solo_ipv4
+except Exception as e:
+    print(f"Aviso: no se pudo forzar el uso de IPv4. {e}")
+
+
+# Todas las consultas a las APIs pasan por esta funcion,
+# para que todas usen las mismas cabeceras.
+def _pedir(url: str, timeout: int = 30):
+    return requests.get(url, headers=CABECERAS, timeout=timeout)
+
 
 class AdvancedTools:
 
@@ -32,7 +64,7 @@ class AdvancedTools:
         )
 
         try:
-            response = requests.get(url, timeout=30)
+            response = _pedir(url, 30)
             response.raise_for_status()  # Lanza una excepcion si la respuesta no es exitosa
             return response.json()  # Intentar decodificar la respuesta como JSON
         except Exception as e:
@@ -60,7 +92,7 @@ class AdvancedTools:
         data = None
         for intento in range(3):
             try:
-                response = requests.get(url, timeout=30)
+                response = _pedir(url, 30)
                 response.raise_for_status()
                 data = response.json()
                 break
@@ -101,7 +133,7 @@ class AdvancedTools:
         url = "https://api.worldbank.org/v2/country?format=json&per_page=400"
 
         try:
-            response = requests.get(url, timeout=30)
+            response = _pedir(url, 30)
             response.raise_for_status()
             data = response.json()
         except Exception as e:
@@ -128,7 +160,7 @@ class AdvancedTools:
         )
 
         try:
-            response = requests.get(url, timeout=60)
+            response = _pedir(url, 60)
             response.raise_for_status()
             data = response.json()
         except Exception as e:
@@ -159,7 +191,7 @@ class AdvancedTools:
         )
 
         try:
-            response = requests.get(url, timeout=60)
+            response = _pedir(url, 60)
             response.raise_for_status()
             data = response.json()
         except Exception as e:
