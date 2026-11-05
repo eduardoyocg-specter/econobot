@@ -66,10 +66,39 @@ class AdvancedTools:
         try:
             response = _pedir(url, 30)
             response.raise_for_status()  # Lanza una excepcion si la respuesta no es exitosa
-            return response.json()  # Intentar decodificar la respuesta como JSON
+            datos = response.json()
         except Exception as e:
             print(f"Error al consultar_tipo_cambio_api: {moneda}. Error: {e}")
             return f"ERROR: No se pudo obtener el tipo de cambio para la moneda: {moneda}"
+
+        # El servicio devuelve unas 160 monedas en cada consulta. Enviarlas
+        # todas al modelo gasta una cantidad enorme de tokens, y al pedir
+        # varios paises a la vez se supera el limite de la cuenta. Por eso
+        # solo se devuelven las monedas de uso frecuente en el curso.
+        monedas_de_interes = [
+            "USD", "EUR", "GTQ", "MXN", "HNL", "NIO", "CRC", "PAB",
+            "BZD", "DOP", "COP", "PEN", "CLP", "ARS", "BRL", "UYU",
+            "GBP", "JPY", "CAD", "CNY", "CHF"
+        ]
+
+        try:
+            todas = datos.get("rates", {})
+            filtradas = {
+                m: todas[m] for m in monedas_de_interes if m in todas
+            }
+
+            return {
+                "moneda_base": datos.get("base_code"),
+                "fecha": datos.get("time_last_update_utc"),
+                "tipos_de_cambio": filtradas,
+                "nota": (
+                    "Solo se incluyen las monedas de uso frecuente. "
+                    "Si se necesita otra, debe consultarse por separado."
+                )
+            }
+        except Exception as e:
+            print(f"Error al filtrar las monedas: {e}")
+            return datos
 
     # ==================================================================
     # METODOS INTERNOS DE APOYO PARA EL API DEL BANCO MUNDIAL
