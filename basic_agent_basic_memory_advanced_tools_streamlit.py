@@ -345,7 +345,11 @@ def crear_memoria():
     return BasicMemory(max_messages=MEMORY_MAX_MESSAGES), False
 
 
-if "memory" not in st.session_state:
+# Se comprueban las dos variables, no solo una. Si la aplicacion se
+# actualiza mientras el navegador tiene una sesion abierta, puede
+# existir la memoria pero no el dato de que tipo es.
+if ("memory" not in st.session_state
+        or "memoria_permanente" not in st.session_state):
     st.session_state.memory, st.session_state.memoria_permanente = crear_memoria()
 
 memory = st.session_state.memory
