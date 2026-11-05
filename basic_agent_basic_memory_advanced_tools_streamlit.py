@@ -24,6 +24,7 @@ import streamlit as st
 
 # Importacion para el manejo memoria y herramientas#
 from basic_memory import BasicMemory
+from supabase_memory import SupabaseMemory
 from advanced_tools import AdvancedTools
 
 
@@ -313,12 +314,42 @@ TOOLS = [
 # Por eso la memoria se guarda en session_state, para que no se
 # reinicie cada vez que el usuario escribe un mensaje.
 
+# Se intenta usar la memoria permanente de Supabase.
+# Si no hay credenciales o la conexion falla, se usa la memoria
+# simple de siempre, para que la aplicacion nunca deje de funcionar.
+def crear_memoria():
+
+    url = os.environ.get("SUPABASE_URL")
+    clave = os.environ.get("SUPABASE_KEY")
+
+    if not url or not clave:
+        try:
+            url = st.secrets["SUPABASE_URL"]
+            clave = st.secrets["SUPABASE_KEY"]
+        except Exception:
+            url = None
+            clave = None
+
+    if url and clave:
+        try:
+            from supabase import create_client
+            cliente = create_client(url, clave)
+            return SupabaseMemory(
+                cliente,
+                sesion="principal",
+                max_messages=MEMORY_MAX_MESSAGES
+            ), True
+        except Exception as e:
+            print(f"No se pudo conectar a Supabase, se usara memoria simple. Error: {e}")
+
+    return BasicMemory(max_messages=MEMORY_MAX_MESSAGES), False
+
+
 if "memory" not in st.session_state:
-    st.session_state.memory = BasicMemory(
-        max_messages=MEMORY_MAX_MESSAGES
-    )
+    st.session_state.memory, st.session_state.memoria_permanente = crear_memoria()
 
 memory = st.session_state.memory
+memoria_permanente = st.session_state.memoria_permanente
 
 
 # =========================
@@ -428,9 +459,21 @@ with st.sidebar:
     st.divider()
     st.caption(f"Memoria: ultimos {MEMORY_MAX_MESSAGES} mensajes")
 
+    if memoria_permanente:
+        st.caption("Almacenamiento: Supabase (permanente)")
+    else:
+        st.caption("Almacenamiento: en sesion (se pierde al recargar)")
+
     if st.button("Limpiar conversacion"):
         st.session_state.chat_history = []
-        st.session_state.memory = BasicMemory(max_messages=MEMORY_MAX_MESSAGES)
+
+        # Si la memoria es permanente hay que borrarla de la base
+        # de datos; si no, basta con crear una memoria nueva.
+        if memoria_permanente:
+            memory.limpiar()
+        else:
+            st.session_state.memory = BasicMemory(max_messages=MEMORY_MAX_MESSAGES)
+
         st.rerun()
 
 
